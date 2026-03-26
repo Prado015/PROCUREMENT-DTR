@@ -4,637 +4,146 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SA DTR — Check In/Out | Procurement</title>
+
+  <!-- Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-  <style>
-    :root {
-      --primary: #2563eb;
-      --primary-dark: #1e40af;
-      --primary-light: #3b82f6;
-      --success: #10b981;
-      --success-dark: #059669;
-      --error: #ef4444;
-      --warning: #f59e0b;
-      --info: #06b6d4;
-      --bg-dark: #0f172a;
-      --card-bg: rgba(30,41,59,0.95);
-      --text-primary: #f1f5f9;
-      --text-secondary: #cbd5e1;
-      --text-dim: #94a3b8;
-      --border: rgba(148,163,184,0.2);
-    }
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body {
-      font-family: 'Outfit', sans-serif;
-      background: var(--bg-dark);
-      color: var(--text-primary);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-    .bg-container { position:fixed; top:0; left:0; width:100%; height:100%; z-index:0; pointer-events:none; }
-    .bg-gradient { position:absolute; width:100%; height:100%; background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%); }
-    .grid-overlay {
-      position:absolute; width:100%; height:100%;
-      background-image: repeating-linear-gradient(0deg,transparent,transparent 50px,rgba(148,163,184,0.03) 50px,rgba(148,163,184,0.03) 51px),
-                        repeating-linear-gradient(90deg,transparent,transparent 50px,rgba(148,163,184,0.03) 50px,rgba(148,163,184,0.03) 51px);
-    }
-    .orb { position:absolute; border-radius:50%; filter:blur(90px); opacity:0.18; animation:float 20s ease-in-out infinite; }
-    .orb1 { width:500px; height:500px; background:var(--primary); top:-200px; left:-100px; }
-    .orb2 { width:400px; height:400px; background:var(--success); bottom:-150px; right:-100px; animation-delay:-10s; }
-    .orb3 { width:300px; height:300px; background:var(--info); top:50%; right:10%; animation-delay:-5s; opacity:0.1; }
-    @keyframes float { 0%,100%{transform:translate(0,0);} 50%{transform:translate(40px,40px);} }
-
-    /* Top bar */
-    .top-bar {
-      position:fixed; top:0; left:0; right:0; z-index:100;
-      display:flex; justify-content:space-between; align-items:center;
-      padding:0.75rem 1.5rem;
-      background:rgba(15,23,42,0.9);
-      backdrop-filter:blur(20px);
-      border-bottom:1px solid var(--border);
-    }
-    .top-user { display:flex; align-items:center; gap:0.75rem; }
-    .user-avatar {
-      width:38px; height:38px; border-radius:10px;
-      background:linear-gradient(135deg,var(--primary),var(--primary-dark));
-      display:flex; align-items:center; justify-content:center;
-      font-weight:800; font-size:1rem;
-    }
-    .user-name { font-weight:700; font-size:0.95rem; }
-    .user-id { font-size:0.8rem; color:var(--text-dim); font-family:'JetBrains Mono',monospace; }
-    .top-actions { display:flex; gap:0.75rem; align-items:center; }
-    .btn-sm {
-      padding:0.5rem 1rem;
-      border-radius:8px; border:none;
-      font-family:'Outfit',sans-serif; font-weight:700; font-size:0.85rem;
-      cursor:pointer; transition:all 0.3s;
-    }
-    .btn-admin { background:rgba(37,99,235,0.15); border:1px solid rgba(37,99,235,0.3); color:var(--primary-light); }
-    .btn-admin:hover { background:rgba(37,99,235,0.25); }
-    .btn-logout { background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#fca5a5; }
-    .btn-logout:hover { background:rgba(239,68,68,0.25); }
-    .datetime-badge {
-      padding:0.4rem 0.875rem;
-      background:rgba(37,99,235,0.1);
-      border:1px solid rgba(37,99,235,0.2);
-      border-radius:8px;
-      color:var(--primary-light);
-      font-family:'JetBrains Mono',monospace;
-      font-size:0.8rem; font-weight:600;
-    }
-
-    .main-wrap {
-      position:relative; z-index:1;
-      width:100%; max-width:520px;
-      margin-top:80px;
-      animation:fadeUp 0.5s ease forwards;
-    }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(20px);} to{opacity:1;transform:translateY(0);} }
-
-    .card {
-      background:var(--card-bg);
-      backdrop-filter:blur(20px);
-      border:1px solid var(--border);
-      border-radius:24px;
-      overflow:hidden;
-      box-shadow:0 25px 60px rgba(0,0,0,0.4);
-    }
-
-    .card-header {
-      padding:2rem 2rem 1.5rem;
-      text-align:center;
-      border-bottom:1px solid var(--border);
-      background:linear-gradient(135deg,rgba(37,99,235,0.08),transparent);
-    }
-    .card-logo {
-      width:64px; height:64px; border-radius:16px;
-      background:linear-gradient(135deg,var(--primary),var(--primary-dark));
-      display:flex; align-items:center; justify-content:center;
-      margin:0 auto 1rem;
-      box-shadow:0 8px 24px rgba(37,99,235,0.35);
-    }
-    .card-logo img { width:44px; height:44px; object-fit:contain; }
-    .card-title { font-size:1.6rem; font-weight:800; margin-bottom:0.25rem; }
-    .card-subtitle { color:var(--text-dim); font-size:0.9rem; }
-    .current-date {
-      margin-top:0.75rem;
-      padding:0.5rem 1rem; border-radius:8px;
-      background:rgba(37,99,235,0.1); border:1px solid rgba(37,99,235,0.2);
-      display:inline-block;
-      color:var(--primary-light); font-family:'JetBrains Mono',monospace;
-      font-size:0.85rem; font-weight:600;
-    }
-
-    .card-body { padding:2rem; }
-
-    /* Status panel (active shift display) */
-    .active-shift-panel {
-      background:rgba(16,185,129,0.1);
-      border:1px solid rgba(16,185,129,0.3);
-      border-radius:14px; padding:1.25rem;
-      margin-bottom:1.5rem; display:none;
-    }
-    .active-shift-panel.show { display:block; }
-    .active-shift-label { font-size:0.8rem; font-weight:700; color:var(--success); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:0.5rem; }
-    .active-shift-name { font-size:1.1rem; font-weight:800; margin-bottom:0.25rem; }
-    .active-shift-meta { font-size:0.85rem; color:var(--text-dim); font-family:'JetBrains Mono',monospace; }
-    .elapsed-timer { font-size:1.75rem; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--success); margin-top:0.5rem; }
-
-    .form-group { margin-bottom:1.25rem; }
-    .form-label {
-      display:block; font-size:0.8rem; font-weight:700;
-      color:var(--text-secondary); margin-bottom:0.5rem;
-      text-transform:uppercase; letter-spacing:0.5px;
-    }
-    .form-input, .form-select {
-      width:100%; padding:0.875rem 1rem;
-      background:rgba(15,23,42,0.6);
-      border:1px solid var(--border);
-      border-radius:10px;
-      color:var(--text-primary);
-      font-family:'Outfit',sans-serif; font-size:1rem;
-      transition:all 0.3s;
-    }
-    .form-input:focus, .form-select:focus {
-      outline:none; border-color:var(--primary);
-      box-shadow:0 0 0 3px rgba(37,99,235,0.15);
-    }
-    .form-input[readonly] { background:rgba(30,41,59,0.5); cursor:default; }
-    .form-select option { background:var(--bg-dark); }
-
-    .custom-schedule { display:none; }
-    .custom-schedule.show { display:block; }
-    .custom-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
-    .custom-note {
-      margin-top:0.75rem; padding:0.75rem;
-      background:rgba(245,158,11,0.1); border:1px solid rgba(245,158,11,0.2);
-      border-radius:8px; font-size:0.83rem; color:#fcd34d;
-    }
-
-    .btn-row { display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:0.5rem; }
-    .btn-action {
-      padding:1rem;
-      border:none; border-radius:12px;
-      font-family:'Outfit',sans-serif; font-size:1rem; font-weight:800;
-      cursor:pointer; transition:all 0.3s;
-      display:flex; align-items:center; justify-content:center; gap:0.5rem;
-    }
-    .btn-checkin { background:linear-gradient(135deg,var(--success),var(--success-dark)); color:white; }
-    .btn-checkin:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(16,185,129,0.4); }
-    .btn-checkout { background:linear-gradient(135deg,var(--warning),#d97706); color:white; }
-    .btn-checkout:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(245,158,11,0.4); }
-    .btn-action:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
-
-    .alert {
-      padding:1rem 1.25rem; border-radius:12px;
-      font-weight:600; margin-bottom:1.25rem;
-      display:none; font-size:0.95rem;
-    }
-    .alert.show { display:block; animation:slideIn 0.3s ease; }
-    @keyframes slideIn { from{opacity:0;transform:translateY(-5px);} to{opacity:1;transform:translateY(0);} }
-    .alert-success { background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#6ee7b7; }
-    .alert-error   { background:rgba(239,68,68,0.15);  border:1px solid rgba(239,68,68,0.3);  color:#fca5a5; }
-    .alert-info    { background:rgba(6,182,212,0.1);   border:1px solid rgba(6,182,212,0.2);  color:#67e8f9; }
-
-    /* My Records */
-    .my-records { margin-top:1.5rem; }
-    .my-records-title { font-size:1rem; font-weight:800; margin-bottom:1rem; color:var(--text-secondary); }
-    .record-item {
-      display:flex; justify-content:space-between; align-items:center;
-      padding:0.875rem 1rem;
-      background:rgba(15,23,42,0.5);
-      border:1px solid var(--border);
-      border-radius:10px; margin-bottom:0.625rem;
-    }
-    .record-left .record-shift { font-weight:700; font-size:0.9rem; }
-    .record-left .record-times { font-size:0.8rem; color:var(--text-dim); font-family:'JetBrains Mono',monospace; margin-top:0.2rem; }
-    .record-status {
-      padding:0.3rem 0.7rem; border-radius:6px;
-      font-size:0.75rem; font-weight:700; text-transform:uppercase;
-    }
-    .status-on-duty { background:rgba(16,185,129,0.2); color:var(--success); border:1px solid rgba(16,185,129,0.3); }
-    .status-completed { background:rgba(148,163,184,0.15); color:var(--text-dim); border:1px solid rgba(148,163,184,0.2); }
-    .no-records { color:var(--text-dim); font-size:0.9rem; text-align:center; padding:1rem 0; }
-
-    .spinner {
-      width:16px; height:16px;
-      border:2px solid rgba(255,255,255,0.3);
-      border-top-color:white; border-radius:50%;
-      animation:spin 0.7s linear infinite;
-    }
-    @keyframes spin { to { transform:rotate(360deg); } }
-
-    /* Loading overlay */
-    #loading-overlay {
-      position:fixed; inset:0; z-index:200;
-      background:var(--bg-dark);
-      display:flex; align-items:center; justify-content:center;
-      flex-direction:column; gap:1rem;
-    }
-    .loading-text { color:var(--text-dim); font-weight:600; }
-  </style>
 </head>
-<body>
+<body class="page-checkin">
 
-<!-- Loading Overlay -->
-<div id="loading-overlay">
-  <div class="spinner" style="width:36px;height:36px;border-width:3px;border-top-color:var(--primary);border-color:rgba(37,99,235,0.2)"></div>
-  <p class="loading-text">Verifying session...</p>
-</div>
+  <!-- Loading Overlay -->
+  <div id="loading-overlay">
+    <div class="spinner" style="width:36px;height:36px;border:3px solid rgba(37,99,235,0.2);border-top-color:var(--primary);display:block;"></div>
+    <p class="loading-text">Verifying session...</p>
+  </div>
 
-<div class="bg-container">
-  <div class="bg-gradient"></div>
-  <div class="grid-overlay"></div>
-  <div class="orb orb1"></div>
-  <div class="orb orb2"></div>
-  <div class="orb orb3"></div>
-</div>
+  <!-- Animated Background -->
+  <div class="bg-container">
+    <div class="bg-gradient"></div>
+    <div class="grid-overlay"></div>
+    <div class="orb orb1"></div>
+    <div class="orb orb2"></div>
+    <div class="orb orb3"></div>
+  </div>
 
-<!-- Top Bar -->
-<div class="top-bar">
-  <div class="top-user">
-    <div class="user-avatar" id="user-avatar">?</div>
-    <div>
-      <div class="user-name" id="user-display-name">Loading...</div>
-      <div class="user-id" id="user-display-id">—</div>
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div class="top-user">
+      <div class="user-avatar" id="user-avatar">?</div>
+      <div>
+        <div class="user-name" id="user-display-name">Loading...</div>
+        <div class="user-id"   id="user-display-id">—</div>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div class="datetime-badge" id="top-clock"></div>
+      <button class="btn-sm btn-admin" id="admin-link-btn"
+              onclick="window.location.href='sa-dtr-admin.html'" style="display:none">
+        📊 Admin Panel
+      </button>
+      <button class="btn-sm btn-logout" onclick="handleLogout()">← Logout</button>
     </div>
   </div>
-  <div class="top-actions">
-    <div class="datetime-badge" id="top-clock"></div>
-    <button class="btn-sm btn-admin" id="admin-link-btn" onclick="window.location.href='sa-dtr-admin.html'" style="display:none">📊 Admin Panel</button>
-    <button class="btn-sm btn-logout" onclick="handleLogout()">← Logout</button>
-  </div>
-</div>
 
-<div class="main-wrap">
-  <div class="card">
-    <div class="card-header">
-      <div class="card-logo">
-        <img src="ush_logo.png" alt="Logo" onerror="this.parentElement.textContent='📋'">
-      </div>
-      <h1 class="card-title" id="card-title-text">DTR Check-In / Out</h1>
-      <p class="card-subtitle">Procurement Department</p>
-      <div class="current-date" id="current-date"></div>
-    </div>
+  <!-- Main Card -->
+  <div class="main-wrap">
+    <div class="card">
 
-    <div class="card-body">
-      <!-- Active shift status -->
-      <div class="active-shift-panel" id="active-panel">
-        <div class="active-shift-label">🟢 Currently On Duty</div>
-        <div class="active-shift-name" id="active-shift-name"></div>
-        <div class="active-shift-meta" id="active-shift-meta"></div>
-        <div class="elapsed-timer" id="elapsed-timer">00:00:00</div>
+      <!-- Card Header -->
+      <div class="card-header">
+        <div class="card-logo">
+          <img src="logo.png" alt="Logo" onerror="this.parentElement.textContent='📋'">
+        </div>
+        <h1 class="card-title" id="card-title-text">DTR Check-In / Out</h1>
+        <p class="card-subtitle">Procurement Department</p>
+        <div class="current-date" id="current-date"></div>
       </div>
 
-      <!-- Alerts -->
-      <div class="alert" id="alert-box"></div>
+      <!-- Card Body -->
+      <div class="card-body">
 
-      <!-- Form -->
-      <div class="form-group">
-        <label class="form-label">Your ID</label>
-        <input type="text" id="person-id" class="form-input" readonly>
-      </div>
+        <!-- Active Shift Status -->
+        <div class="active-shift-panel" id="active-panel">
+          <div class="active-shift-label">🟢 Currently On Duty</div>
+          <div class="active-shift-name" id="active-shift-name"></div>
+          <div class="active-shift-meta" id="active-shift-meta"></div>
+          <div class="elapsed-timer"     id="elapsed-timer">00:00:00</div>
+        </div>
 
-      <div class="form-group">
-        <label class="form-label">Department</label>
-        <input type="text" class="form-input" value="Procurement" readonly>
-      </div>
+        <!-- Alert Box -->
+        <div class="alert" id="alert-box"></div>
 
-      <div class="form-group">
-        <label class="form-label">Shift Type</label>
-        <select id="shift-type" class="form-select">
-          <option value="">Select Shift</option>
-        </select>
-      </div>
+        <!-- Your ID (read-only) -->
+        <div class="form-group">
+          <label class="form-label">Your ID</label>
+          <input type="text" id="person-id" class="form-input" readonly>
+        </div>
 
-      <!-- Custom Schedule (Broken Schedule) -->
-      <div class="custom-schedule" id="custom-schedule">
-        <div class="form-label" style="color:var(--warning)">📋 Custom Schedule Times</div>
-        <div class="custom-grid" style="margin-top:0.5rem">
-          <div class="form-group" style="margin:0">
-            <label class="form-label">Start Time</label>
-            <input type="time" id="custom-start" class="form-input">
+        <!-- Department (read-only) -->
+        <div class="form-group">
+          <label class="form-label">Department</label>
+          <input type="text" class="form-input" value="Procurement" readonly>
+        </div>
+
+        <!-- Shift Type -->
+        <div class="form-group">
+          <label class="form-label">Shift Type</label>
+          <select id="shift-type" class="form-select">
+            <option value="">Select Shift</option>
+            <!-- Populated dynamically via checkin.script.js -->
+          </select>
+        </div>
+
+        <!-- Custom Schedule (shown for Broken Schedule shifts) -->
+        <div class="custom-schedule" id="custom-schedule">
+          <div class="form-label" style="color:var(--warning)">📋 Custom Schedule Times</div>
+          <div class="custom-grid" style="margin-top:0.5rem">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">Start Time</label>
+              <input type="time" id="custom-start" class="form-input">
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">End Time</label>
+              <input type="time" id="custom-end" class="form-input">
+            </div>
           </div>
-          <div class="form-group" style="margin:0">
-            <label class="form-label">End Time</label>
-            <input type="time" id="custom-end" class="form-input">
+          <div class="custom-note">
+            ℹ️ Late calculation will be based on your specified start time.
           </div>
         </div>
-        <div class="custom-note">
-          ℹ️ Late calculation will be based on your specified start time.
+
+        <!-- Action Buttons -->
+        <div class="btn-row">
+          <button class="btn-action btn-checkin"  id="checkin-btn"  onclick="handleAction('checkin')">
+            ✓ Check In
+          </button>
+          <button class="btn-action btn-checkout" id="checkout-btn" onclick="handleAction('checkout')">
+            ↩ Check Out
+          </button>
         </div>
-      </div>
 
-      <div class="btn-row">
-        <button class="btn-action btn-checkin" id="checkin-btn" onclick="handleAction('checkin')">
-          ✓ Check In
-        </button>
-        <button class="btn-action btn-checkout" id="checkout-btn" onclick="handleAction('checkout')">
-          ↩ Check Out
-        </button>
-      </div>
+        <!-- Today's Records -->
+        <div class="my-records">
+          <div class="my-records-title">📋 Today's Records</div>
+          <div id="records-list"><div class="no-records">Loading...</div></div>
+        </div>
 
-      <!-- Today's Records -->
-      <div class="my-records">
-        <div class="my-records-title">📋 Today's Records</div>
-        <div id="records-list"><div class="no-records">Loading...</div></div>
       </div>
     </div>
   </div>
-</div>
 
-<script>
-  // ═══════════════════════════════════════════
-  // 🔥 FIREBASE CONFIG — Replace with yours
-  // ═══════════════════════════════════════════
-  const firebaseConfig = {
-    apiKey: "YOUR-API-KEY",
-    authDomain: "YOUR-PROJECT.firebaseapp.com",
-    projectId: "YOUR-PROJECT-ID",
-    storageBucket: "YOUR-PROJECT.appspot.com",
-    messagingSenderId: "YOUR-SENDER-ID",
-    appId: "YOUR-APP-ID"
-  };
+  <!-- Firebase Config (shared) -->
+  <script src="firebase.config.js"></script>
 
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db   = firebase.firestore();
+  <!-- Page Script -->
+  <script src="checkin.script.js"></script>
 
-  // ─── State ───
-  let currentUser  = null;
-  let currentPerson= null; // { id, first_name, last_name, type: 'sa'|'staff', role }
-  let shifts       = {};
-  let activeRecord = null;
-  let elapsedInterval = null;
-  let recordsUnsub = null;
-
-  // ─── Clock ───
-  function updateClock() {
-    const now = new Date();
-    const opts = { weekday:'long', year:'numeric', month:'long', day:'numeric' };
-    document.getElementById('current-date').textContent = now.toLocaleDateString('en-PH', opts);
-    document.getElementById('top-clock').textContent = now.toLocaleTimeString('en-PH', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
-  }
-  setInterval(updateClock, 1000);
-  updateClock();
-
-  // ─── Auth Guard ───
-  auth.onAuthStateChanged(async (user) => {
-    if (!user) { window.location.href = 'sa-dtr-login.html'; return; }
-    currentUser = user;
-    try {
-      const userDoc = await db.collection('users').doc(user.uid).get();
-      if (!userDoc.exists) { await auth.signOut(); return; }
-      const data = userDoc.data();
-
-      // Show admin link if staff/admin
-      if (data.role === 'staff' || data.role === 'admin') {
-        document.getElementById('admin-link-btn').style.display = 'block';
-      }
-
-      // Load person profile
-      if (data.role === 'sa') {
-        const saDoc = await db.collection('studentAssistants').doc(data.personId).get();
-        currentPerson = { ...saDoc.data(), id: data.personId, type: 'sa', role: data.role };
-        document.getElementById('card-title-text').textContent = 'DTR Check-In / Out';
-      } else {
-        const staffDoc = await db.collection('staff').doc(data.personId).get();
-        currentPerson = { ...staffDoc.data(), id: data.personId, type: 'staff', role: data.role };
-        document.getElementById('card-title-text').textContent = 'Staff DTR Check-In / Out';
-      }
-
-      // Update top bar
-      const initials = (currentPerson.first_name[0] + currentPerson.last_name[0]).toUpperCase();
-      document.getElementById('user-avatar').textContent = initials;
-      document.getElementById('user-display-name').textContent = `${currentPerson.first_name} ${currentPerson.last_name}`;
-      document.getElementById('user-display-id').textContent = currentPerson.id + ' • Procurement';
-      document.getElementById('person-id').value = currentPerson.id;
-
-      await loadShifts();
-      await loadTodayRecords();
-      document.getElementById('loading-overlay').style.display = 'none';
-    } catch (err) {
-      console.error(err);
-      document.getElementById('loading-overlay').innerHTML = '<p style="color:#fca5a5;font-weight:700">Error loading profile. Please refresh.</p>';
-    }
-  });
-
-  async function loadShifts() {
-    const snap = await db.collection('shifts').get();
-    const sel  = document.getElementById('shift-type');
-    snap.forEach(doc => {
-      shifts[doc.id] = doc.data();
-      const opt = document.createElement('option');
-      opt.value = doc.id;
-      opt.textContent = doc.data().label;
-      sel.appendChild(opt);
-    });
-    sel.addEventListener('change', () => {
-      const shift = shifts[sel.value];
-      document.getElementById('custom-schedule').classList.toggle('show', !!(shift && shift.allows_custom));
-    });
-  }
-
-  async function loadTodayRecords() {
-    const today = getTodayStr();
-    const col   = currentPerson.type === 'sa' ? 'dtrRecords' : 'staffDtrRecords';
-
-    if (recordsUnsub) recordsUnsub();
-    recordsUnsub = db.collection(col)
-      .where('personId', '==', currentPerson.id)
-      .where('record_date', '==', today)
-      .orderBy('time_in', 'desc')
-      .onSnapshot(snap => {
-        const records = [];
-        snap.forEach(doc => records.push({ id: doc.id, ...doc.data() }));
-        renderRecords(records);
-
-        // Find active record
-        activeRecord = records.find(r => r.status === 'On Duty') || null;
-        renderActivePanel();
-      });
-  }
-
-  function renderRecords(records) {
-    const container = document.getElementById('records-list');
-    if (!records.length) {
-      container.innerHTML = '<div class="no-records">No DTR records today.</div>';
-      return;
-    }
-    container.innerHTML = records.map(r => {
-      const tin  = r.time_in  ? new Date(r.time_in).toLocaleTimeString('en-PH', {hour:'2-digit',minute:'2-digit',hour12:true}) : '—';
-      const tout = r.time_out ? new Date(r.time_out).toLocaleTimeString('en-PH', {hour:'2-digit',minute:'2-digit',hour12:true}) : 'Ongoing';
-      const hrs  = r.hours_worked != null ? r.hours_worked.toFixed(2) + ' hrs' : '—';
-      return `
-        <div class="record-item">
-          <div class="record-left">
-            <div class="record-shift">${r.shift_type}</div>
-            <div class="record-times">In: ${tin} | Out: ${tout} | ${hrs}</div>
-          </div>
-          <span class="record-status ${r.status === 'On Duty' ? 'status-on-duty' : 'status-completed'}">${r.status}</span>
-        </div>`;
-    }).join('');
-  }
-
-  function renderActivePanel() {
-    const panel = document.getElementById('active-panel');
-    if (!activeRecord) {
-      panel.classList.remove('show');
-      if (elapsedInterval) { clearInterval(elapsedInterval); elapsedInterval = null; }
-      return;
-    }
-    panel.classList.add('show');
-    document.getElementById('active-shift-name').textContent = activeRecord.shift_type;
-    const tin = new Date(activeRecord.time_in).toLocaleTimeString('en-PH', {hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true});
-    document.getElementById('active-shift-meta').textContent = `Checked in at ${tin}`;
-
-    if (elapsedInterval) clearInterval(elapsedInterval);
-    elapsedInterval = setInterval(() => {
-      const sec = Math.floor((Date.now() - new Date(activeRecord.time_in).getTime()) / 1000);
-      const h = String(Math.floor(sec/3600)).padStart(2,'0');
-      const m = String(Math.floor((sec%3600)/60)).padStart(2,'0');
-      const s = String(sec%60).padStart(2,'0');
-      document.getElementById('elapsed-timer').textContent = `${h}:${m}:${s}`;
-    }, 1000);
-  }
-
-  async function handleAction(action) {
-    const shiftType   = document.getElementById('shift-type').value;
-    const customStart = document.getElementById('custom-start').value;
-    const customEnd   = document.getElementById('custom-end').value;
-    hideAlert();
-
-    if (action === 'checkin') {
-      if (!shiftType) { showAlert('Please select a shift type.', 'error'); return; }
-      if (shifts[shiftType]?.allows_custom && (!customStart || !customEnd)) {
-        showAlert('Please enter custom start and end times for broken schedule.', 'error'); return;
-      }
-      if (activeRecord) { showAlert('You are already checked in for a shift today. Please check out first.', 'error'); return; }
-      await doCheckin(shiftType, customStart, customEnd);
-    } else {
-      if (!activeRecord) { showAlert('No active shift found. Please check in first.', 'error'); return; }
-      await doCheckout();
-    }
-  }
-
-  async function doCheckin(shiftType, customStart, customEnd) {
-    setBtns(true);
-    try {
-      const today  = getTodayStr();
-      const now    = new Date();
-      const nowISO = now.toISOString();
-      const shift  = shifts[shiftType];
-
-      // Duplicate check
-      const dup = await db.collection(getCollection())
-        .where('personId', '==', currentPerson.id)
-        .where('record_date', '==', today)
-        .where('shift_type', '==', shiftType)
-        .where('status', '==', 'On Duty')
-        .get();
-      if (!dup.empty) { showAlert(`Already checked in for ${shift.label} today.`, 'error'); setBtns(false); return; }
-
-      // Late calc
-      const startStr  = customStart || shift.expected_start;
-      const expStart  = new Date(`${today}T${startStr}:00`);
-      const lateMin   = now > expStart ? Math.floor((now - expStart) / 60000) : 0;
-
-      const recId = `DTR${Date.now()}`;
-      await db.collection(getCollection()).doc(recId).set({
-        personId:     currentPerson.id,
-        personName:   `${currentPerson.first_name} ${currentPerson.last_name}`,
-        personType:   currentPerson.type,
-        department:   'Procurement',
-        shift_type:   shiftType,
-        record_date:  today,
-        time_in:      nowISO,
-        time_out:     null,
-        status:       'On Duty',
-        hours_worked: null,
-        late_minutes: lateMin,
-        undertime_minutes: 0,
-        custom_start: customStart || null,
-        custom_end:   customEnd   || null,
-        created_at:   nowISO,
-      });
-
-      const tin = now.toLocaleTimeString('en-PH', {hour:'2-digit',minute:'2-digit',hour12:true});
-      showAlert(`✅ Checked in for ${shift.label} at ${tin}${lateMin > 0 ? ` (${lateMin} min late)` : ''}`, 'success');
-    } catch (err) {
-      showAlert('Check-in failed: ' + err.message, 'error');
-    } finally {
-      setBtns(false);
-    }
-  }
-
-  async function doCheckout() {
-    setBtns(true);
-    try {
-      const now    = new Date();
-      const nowISO = now.toISOString();
-      const tin    = new Date(activeRecord.time_in);
-      const shift  = shifts[activeRecord.shift_type];
-
-      const hoursWorked = (now - tin) / 3600000;
-
-      // Undertime calc
-      const today  = getTodayStr();
-      const endStr = activeRecord.custom_end || shift?.expected_end || '17:00';
-      const expEnd = new Date(`${today}T${endStr}:00`);
-      const undertimeMin = now < expEnd ? Math.floor((expEnd - now) / 60000) : 0;
-
-      await db.collection(getCollection()).doc(activeRecord.id).update({
-        time_out:          nowISO,
-        status:            'Completed',
-        hours_worked:      parseFloat(hoursWorked.toFixed(4)),
-        undertime_minutes: undertimeMin,
-      });
-
-      const tout = now.toLocaleTimeString('en-PH', {hour:'2-digit',minute:'2-digit',hour12:true});
-      showAlert(`✅ Checked out at ${tout} — ${hoursWorked.toFixed(2)} hours worked.`, 'success');
-    } catch (err) {
-      showAlert('Check-out failed: ' + err.message, 'error');
-    } finally {
-      setBtns(false);
-    }
-  }
-
-  function getCollection() {
-    return currentPerson.type === 'sa' ? 'dtrRecords' : 'staffDtrRecords';
-  }
-
-  function getTodayStr() {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  }
-
-  function setBtns(disabled) {
-    document.getElementById('checkin-btn').disabled  = disabled;
-    document.getElementById('checkout-btn').disabled = disabled;
-  }
-
-  function showAlert(msg, type) {
-    const el = document.getElementById('alert-box');
-    el.textContent = msg;
-    el.className = `alert alert-${type} show`;
-    setTimeout(() => el.classList.remove('show'), 6000);
-  }
-
-  function hideAlert() {
-    document.getElementById('alert-box').classList.remove('show');
-  }
-
-  async function handleLogout() {
-    if (recordsUnsub) recordsUnsub();
-    if (elapsedInterval) clearInterval(elapsedInterval);
-    await auth.signOut();
-    window.location.href = 'sa-dtr-login.html';
-  }
-</script>
 </body>
 </html>
